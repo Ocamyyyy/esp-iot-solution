@@ -70,6 +70,45 @@ static esp_err_t imu_gesture_inference_run_model(
     return ESP_OK;
 }
 
+static size_t imu_gesture_inference_expected_channels(
+    imu_gesture_inference_input_source_t input_source)
+{
+    switch (input_source) {
+    case IMU_GESTURE_INFERENCE_INPUT_GYRO:
+    case IMU_GESTURE_INFERENCE_INPUT_ACCEL:
+        return 3;
+    case IMU_GESTURE_INFERENCE_INPUT_ACCEL_GYRO:
+        return 6;
+    default:
+        return 0;
+    }
+}
+
+static bool imu_gesture_inference_copy_sample_channels(
+    imu_gesture_inference_input_source_t input_source,
+    const imu_gesture_sample_t *sample,
+    float *dst)
+{
+    if (sample == NULL || dst == NULL) {
+        return false;
+    }
+
+    switch (input_source) {
+    case IMU_GESTURE_INFERENCE_INPUT_GYRO:
+        memcpy(dst, sample->gyro, sizeof(sample->gyro));
+        return true;
+    case IMU_GESTURE_INFERENCE_INPUT_ACCEL:
+        memcpy(dst, sample->accel, sizeof(sample->accel));
+        return true;
+    case IMU_GESTURE_INFERENCE_INPUT_ACCEL_GYRO:
+        memcpy(dst, sample->accel, sizeof(sample->accel));
+        memcpy(dst + 3, sample->gyro, sizeof(sample->gyro));
+        return true;
+    default:
+        return false;
+    }
+}
+
 static esp_err_t imu_gesture_inference_process_pending_internal(
     imu_gesture_detector_t *detector,
     size_t *out_processed)
@@ -94,8 +133,12 @@ static esp_err_t imu_gesture_inference_process_pending_internal(
         float *dst = infer->window +
                      infer->collected_samples *
                      infer->config.model->input_channels;
-        for (size_t i = 0; i < infer->config.model->input_channels; ++i) {
-            dst[i] = sample.gyro[i];
+        if (!imu_gesture_inference_copy_sample_channels(
+                    infer->config.input_source, &sample, dst)) {
+            if (out_processed != NULL) {
+                *out_processed = processed;
+            }
+            return ESP_ERR_INVALID_STATE;
         }
         infer->collected_samples++;
 
@@ -182,11 +225,14 @@ static bool imu_gesture_is_inference_config_valid(
         return false;
     }
 
-    if (config->model->input_channels > 3) {
+    const size_t expected_channels =
+        imu_gesture_inference_expected_channels(config->input_source);
+
+    if (expected_channels == 0 || config->model->input_channels > 6) {
         return false;
     }
 
-    return true;
+    return config->model->input_channels == expected_channels;
 }
 
 esp_err_t imu_gesture_inference_detector_create(
@@ -270,13 +316,11 @@ esp_err_t imu_gesture_inference_detector_process_single_shot_buffer(
     }
 
     for (size_t sample_idx = 0; sample_idx < sample_count; ++sample_idx) {
-        const float *src = samples[sample_idx].gyro;
         float *dst = infer->window +
                      sample_idx * infer->config.model->input_channels;
-        for (size_t axis_idx = 0;
-                axis_idx < infer->config.model->input_channels;
-                ++axis_idx) {
-            dst[axis_idx] = src[axis_idx];
+        if (!imu_gesture_inference_copy_sample_channels(
+                    infer->config.input_source, &samples[sample_idx], dst)) {
+            return ESP_ERR_INVALID_STATE;
         }
     }
 

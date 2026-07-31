@@ -63,6 +63,15 @@ typedef struct imu_gesture_inference_model_t {
 } imu_gesture_inference_model_t;
 
 /**
+ * @brief Sensor-source layout used when flattening IMU samples into model input
+ */
+typedef enum imu_gesture_inference_input_source_t {
+    IMU_GESTURE_INFERENCE_INPUT_GYRO = 0,       /*!< Use gyroscope axes only: gx, gy, gz */
+    IMU_GESTURE_INFERENCE_INPUT_ACCEL = 1,      /*!< Use accelerometer axes only: ax, ay, az */
+    IMU_GESTURE_INFERENCE_INPUT_ACCEL_GYRO = 2, /*!< Use accelerometer then gyroscope: ax, ay, az, gx, gy, gz */
+} imu_gesture_inference_input_source_t;
+
+/**
  * @brief Inference detector runtime configuration
  *
  * The configuration selects one compile-time model descriptor and adds the
@@ -72,6 +81,7 @@ typedef struct imu_gesture_inference_config_t {
     const imu_gesture_inference_model_t *model; /*!< Static model descriptor */
     uint32_t window_step;                       /*!< Sliding step in samples for realtime inference */
     uint32_t sample_queue_len;                  /*!< Internal detector sample queue length */
+    imu_gesture_inference_input_source_t input_source; /*!< Sensor layout used to build model input */
 } imu_gesture_inference_config_t;
 
 /**
