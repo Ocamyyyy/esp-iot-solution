@@ -95,6 +95,7 @@ The inference detector separates compile-time model facts from runtime policy.
 - `input_length`
 - `input_channels`
 - `output_count`
+- `model_preprocess`
 - `model_init`
 - `model_predict`
 
@@ -103,11 +104,20 @@ The inference detector separates compile-time model facts from runtime policy.
 - `model`
 - `window_step`
 - `sample_queue_len`
+- `input_source`
 
 Applications still feed one `imu_gesture_sample_t` at a time in time order.
 
-The detector owns internal window assembly and passes the time-ordered sample
-window directly to `model_predict()` flattened in `[L, C]` order.
+The detector owns raw window assembly and derives each `[C]` row from
+`input_source`:
+
+- `IMU_GESTURE_INFERENCE_INPUT_GYRO`: use gyroscope channels only
+- `IMU_GESTURE_INFERENCE_INPUT_ACCEL`: use accelerometer channels only
+- `IMU_GESTURE_INFERENCE_INPUT_ACCEL_GYRO`: use accelerometer first, then gyroscope
+
+If `model_preprocess` is not `NULL`, the detector calls it once on the full
+assembled `[L, C]` window before `model_predict()`. If it is `NULL`, the raw
+assembled window is passed to `model_predict()` directly.
 
 The detector caches the latest successful inference result, and applications can read it through `imu_gesture_inference_detector_get_last_result()`.
 

@@ -158,6 +158,7 @@ extern "C" void app_main(void)
         .model = model,
         .window_step = model->input_length,
         .sample_queue_len = 8,
+        .input_source = IMU_GESTURE_INFERENCE_INPUT_GYRO,
     };
 
     if (model == nullptr) {
